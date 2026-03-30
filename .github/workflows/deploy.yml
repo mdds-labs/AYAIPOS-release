@@ -78,48 +78,18 @@ jobs:
         working-directory: app
         run: npm ci
 
-      - name: Check signing secrets presence
-        shell: pwsh
-        env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: |
-          $keyPresent = -not [string]::IsNullOrEmpty($env:TAURI_SIGNING_PRIVATE_KEY)
-          $passPresent = -not [string]::IsNullOrEmpty($env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD)
-          "TAURI_SIGNING_PRIVATE_KEY present: $keyPresent"
-          "TAURI_SIGNING_PRIVATE_KEY_PASSWORD present: $passPresent"
-
-      - name: Compute tauri build args
-        id: tauri_build
-        shell: pwsh
-        env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-        run: |
-          $baseArgs = "${{ matrix.args }}"
-          $verboseArgs = "--verbose"
-
-          if ([string]::IsNullOrEmpty($env:TAURI_SIGNING_PRIVATE_KEY)) {
-            $computedArgs = "$baseArgs --no-sign $verboseArgs".Trim()
-            "args=$computedArgs" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-            "uploadUpdaterSignatures=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-          } else {
-            $computedArgs = "$baseArgs $verboseArgs".Trim()
-            "args=$computedArgs" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-            "uploadUpdaterSignatures=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-          }
-
       - name: Build and upload (tauri-action)
         uses: tauri-apps/tauri-action@v0.6.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           projectPath: app
           # `npx tauri` often fails because the CLI entrypoint lives in `@tauri-apps/cli`
           tauriScript: npx --yes "@tauri-apps/cli"
           tagName: ${{ env.TAG_NAME }}
           releaseName: ${{ env.TAG_NAME }}
-          args: ${{ steps.tauri_build.outputs.args }}
-          uploadUpdaterJson: true
-          uploadUpdaterSignatures: ${{ steps.tauri_build.outputs.uploadUpdaterSignatures }}
+          # Always build unsigned in CI (so you can push without signing keys).
+          # This avoids failures when `TAURI_SIGNING_PRIVATE_KEY` is not configured.
+          args: ${{ matrix.args }} --no-sign --verbose
+          # Building updater signatures requires signing keys; for CI without keys, skip updater.
+          includeUpdaterJson: false
