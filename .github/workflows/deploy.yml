@@ -86,7 +86,8 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           projectPath: app
-          tauriScript: npx tauri
+          # `npx tauri` often fails because the CLI entrypoint lives in `@tauri-apps/cli`
+          tauriScript: npx @tauri-apps/cli
           tagName: ${{ env.TAG_NAME }}
           releaseName: ${{ env.TAG_NAME }}
           args: ${{ matrix.args }}
