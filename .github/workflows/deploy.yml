@@ -78,7 +78,19 @@ jobs:
         working-directory: app
         run: npm ci
 
-      - name: Build and upload (tauri-action)
+      - name: Check signing secrets presence
+        shell: pwsh
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          $keyPresent = -not [string]::IsNullOrEmpty($env:TAURI_SIGNING_PRIVATE_KEY)
+          $passPresent = -not [string]::IsNullOrEmpty($env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD)
+          "TAURI_SIGNING_PRIVATE_KEY present: $keyPresent"
+          "TAURI_SIGNING_PRIVATE_KEY_PASSWORD present: $passPresent"
+
+      - name: Build and upload (tauri-action, signed)
+        if: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
         uses: tauri-apps/tauri-action@v0.6.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -87,9 +99,24 @@ jobs:
         with:
           projectPath: app
           # `npx tauri` often fails because the CLI entrypoint lives in `@tauri-apps/cli`
-          tauriScript: npx @tauri-apps/cli
+          tauriScript: npx --yes "@tauri-apps/cli"
           tagName: ${{ env.TAG_NAME }}
           releaseName: ${{ env.TAG_NAME }}
-          args: ${{ matrix.args }}
+          args: ${{ matrix.args }} --verbose
           uploadUpdaterJson: true
           uploadUpdaterSignatures: true
+
+      - name: Build and upload (tauri-action, unsigned)
+        if: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY == '' }}
+        uses: tauri-apps/tauri-action@v0.6.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: app
+          tauriScript: npx --yes "@tauri-apps/cli"
+          tagName: ${{ env.TAG_NAME }}
+          releaseName: ${{ env.TAG_NAME }}
+          # Skip bundle signing when signing key secret is not configured
+          args: ${{ matrix.args }} --no-sign --verbose
+          uploadUpdaterJson: true
+          uploadUpdaterSignatures: false
