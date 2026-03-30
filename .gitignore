@@ -1,0 +1,4 @@
+# Tauri signing keys - never commit to GitHub
+src-tauri/ayai-signing.key
+src-tauri/ayai-signing.key.pub
+
