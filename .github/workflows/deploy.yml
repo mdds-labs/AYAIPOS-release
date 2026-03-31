@@ -78,6 +78,18 @@ jobs:
         working-directory: app
         run: npm ci
 
+      - name: Create CI tauri config override (disable updater artifacts)
+        shell: pwsh
+        run: |
+          $override = @'
+          {
+            "bundle": {
+              "createUpdaterArtifacts": false
+            }
+          }
+          '@
+          Set-Content -Path "app/ci-tauri-config.json" -Value $override -Encoding utf8
+
       - name: Build and upload (tauri-action)
         uses: tauri-apps/tauri-action@v0.6.2
         env:
@@ -85,11 +97,11 @@ jobs:
         with:
           projectPath: app
           # `npx tauri` often fails because the CLI entrypoint lives in `@tauri-apps/cli`
-          tauriScript: npx --yes "@tauri-apps/cli"
+          tauriScript: npx --yes @tauri-apps/cli
           tagName: ${{ env.TAG_NAME }}
           releaseName: ${{ env.TAG_NAME }}
           # Always build unsigned in CI (so you can push without signing keys).
           # This avoids failures when `TAURI_SIGNING_PRIVATE_KEY` is not configured.
-          args: ${{ matrix.args }} --no-sign --verbose
+          args: ${{ matrix.args }} --no-sign --verbose --config ${{ github.workspace }}/app/ci-tauri-config.json
           # Building updater signatures requires signing keys; for CI without keys, skip updater.
           includeUpdaterJson: false
